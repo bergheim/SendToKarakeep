@@ -18,8 +18,13 @@
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 ;;
-;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;; You should check outGNU General Public License
+;; See <https://www.gnu.org/licenses/>.
+
+;; This is my first code release so I'm not going to spend a lot
+;; of time on licenses and stuff like that. Use it and be happy.
+;; Just don't use it to blow up the world. If you use it to blow
+;; up the world, I'll be most put out! And don't use it to hurt people.
 
 
 ;; Send Link to Karakeep
