@@ -42,13 +42,18 @@
 (defvar karakeep-api-token "YourAPIKey"
   "Authorization token for Karakeep.")
 
-(defun karakeep--get-org-link-at-point ()
-  "Extract the Org-mode link at point."
-  (let ((context (org-element-context)))
-    (when (eq (car context) 'link)
-      (let ((url (org-element-property :raw-link context))
-            (desc (org-element-contents context)))
-        (list url (if desc (org-trim (org-no-properties (car desc))) ""))))))
+(defun karakeep--send-request (payload)
+  "Send PAYLOAD to Karakeep API.
+PAYLOAD should be an alist that will be JSON-encoded."
+  (let* ((json-string (json-encode payload))
+         (json-payload (string-as-unibyte
+                        (encode-coding-string json-string 'utf-8)))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          `(("Content-Type" . "application/json; charset=utf-8")
+            ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
+         (url-request-data json-payload))
+    (url-retrieve karakeep-api-url #'karakeep--handle-response)))
 
 (defun karakeep--handle-response (status)
   "Handle the response from Karakeep API.
@@ -69,40 +74,33 @@ STATUS is the response status from url-retrieve."
       (message "❌ Karakeep error: %s" (or response "Unknown error"))))
     (kill-buffer (current-buffer))))
 
+(defun karakeep--get-org-link-at-point ()
+  "Extract the Org-mode link at point."
+  (let ((context (org-element-context)))
+    (when (eq (car context) 'link)
+      (let ((url (org-element-property :raw-link context))
+            (desc (org-element-contents context)))
+        (list url (if desc (org-trim (org-no-properties (car desc))) ""))))))
+
 ;; Send link that pointer is over
 (defun karakeep-send-link ()
   "Send the Org link at point to Karakeep."
   (interactive)
   (if-let* ((link-data (karakeep--get-org-link-at-point))
             (url (car link-data))
-            (title (cadr link-data))
-            (json-payload (json-encode
-                           `(("type" . "link")
-                             ("url" . ,url)
-                             ("title" . ,title))))
-            (url-request-method "POST")
-            (url-request-extra-headers
-             `(("Content-Type" . "application/json")
-               ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
-            (url-request-data json-payload))
-      (url-retrieve karakeep-api-url #'karakeep--handle-response)
+            (title (cadr link-data)))
+      (karakeep--send-request `(("type" . "link")
+                                ("url" . ,url)
+                                ("title" . ,title)))
     (message "⚠️ No valid link at point.")))
 
-;; Send marked text
 (defun karakeep-send-region ()
   "Send the currently active region (marked text) to Karakeep as a 'text' type."
   (interactive)
   (if (use-region-p)
-      (let* ((text (buffer-substring-no-properties (region-beginning) (region-end)))
-             (json-payload (json-encode
-                            `(("type" . "text")
-                              ("text" . ,text))))
-             (url-request-method "POST")
-             (url-request-extra-headers
-              `(("Content-Type" . "application/json")
-                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
-             (url-request-data json-payload))
-        (url-retrieve karakeep-api-url #'karakeep--handle-response))
+      (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
+        (karakeep--send-request `(("type" . "text")
+                                  ("text" . ,text))))
     (message "⚠️ No active region (marked text).")))
 
 
@@ -114,25 +112,16 @@ STATUS is the response status from url-retrieve."
                   (elfeed-search-selected :single)))
          (url (when entry (elfeed-entry-link entry)))
          (title (when entry (elfeed-entry-title entry))))
-
     (if (not entry)
         (message "⚠️ No entry selected.")
       ;; Add star tag to the entry
       (elfeed-tag entry 'star)
       (when (eq major-mode 'elfeed-search-mode)
         (elfeed-search-update-entry entry))
-
       ;; Send to Karakeep
-      (let* ((json-payload (json-encode
-                            `(("type" . "link")
-                              ("url" . ,url)
-                              ("title" . ,title))))
-             (url-request-method "POST")
-             (url-request-extra-headers
-              `(("Content-Type" . "application/json")
-                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
-             (url-request-data json-payload))
-        (url-retrieve karakeep-api-url #'karakeep--handle-response)))))
+      (karakeep--send-request `(("type" . "link")
+                                ("url" . ,url)
+                                ("title" . ,title))))))
 
 (defun karakeep-send-eww-page ()
   "Send the current EWW page to Karakeep."
@@ -140,16 +129,9 @@ STATUS is the response status from url-retrieve."
   (let* ((url (eww-current-url))
          (title (plist-get eww-data :title)))
     (when url
-      (let* ((json-payload (json-encode
-                            `(("type" . "link")
-                              ("url" . ,url)
-                              ("title" . ,title))))
-             (url-request-method "POST")
-             (url-request-extra-headers
-              `(("Content-Type" . "application/json")
-                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
-             (url-request-data json-payload))
-        (url-retrieve karakeep-api-url #'karakeep--handle-response)))))
+      (karakeep--send-request `(("type" . "link")
+                                ("url" . ,url)
+                                ("title" . ,title))))))
 
 (defun karakeep-dwim ()
   "Send content to Karakeep based on context.
