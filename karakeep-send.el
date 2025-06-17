@@ -111,4 +111,51 @@
            (kill-buffer (current-buffer)))))
     (message "⚠️ No active region (marked text).")))
 
+
+(defun elfeed-star-and-send-to-karakeep ()
+  "Star the current Elfeed entry and send it to Karakeep.
+Works in both elfeed-search-mode and elfeed-show-mode."
+  (interactive)
+  (let* ((entry (if (eq major-mode 'elfeed-show-mode)
+                    elfeed-show-entry
+                  (elfeed-search-selected :single)))
+         (url (when entry (elfeed-entry-link entry)))
+         (title (when entry (elfeed-entry-title entry))))
+
+    (if (not entry)
+        (message "⚠️ No entry selected.")
+      ;; Add star tag to the entry
+      (elfeed-tag entry 'star)
+      (when (eq major-mode 'elfeed-search-mode)
+        (elfeed-search-update-entry entry))
+
+      ;; Send to Karakeep
+      (let* ((json-payload (json-encode
+                            `(("type" . "link")
+                              ("url" . ,url)
+                              ("title" . ,title))))
+             (url-request-method "POST")
+             (url-request-extra-headers
+              `(("Content-Type" . "application/json")
+                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
+             (url-request-data json-payload))
+        (url-retrieve
+         karakeep-api-url
+         (lambda (status)
+           (goto-char url-http-end-of-headers)
+           (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
+                  (parsed-response (ignore-errors (json-parse-string response)))
+                  (response-url (when parsed-response
+                                  (gethash "url" (gethash "content" parsed-response))))
+                  (already-exists (when parsed-response
+                                    (eq (gethash "alreadyExists" parsed-response) t))))
+             (cond
+              ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
+               (message "ℹ️ Link already exists in Karakeep: %s" (or response-url url)))
+              ((and parsed-response (gethash "id" parsed-response))
+               (message "✅ Link starred and sent to Karakeep: %s" (or response-url url)))
+              (t
+               (message "❌ Karakeep error: %s" (or response "Unknown error"))))
+             (kill-buffer (current-buffer)))))))))
+
 (provide 'karakeep-send)
