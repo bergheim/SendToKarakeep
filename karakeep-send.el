@@ -53,30 +53,37 @@
 (defun karakeep-send-link ()
   "Send the Org link at point to Karakeep."
   (interactive)
-  (let* ((link-data (karakeep--get-org-link-at-point)))
-    (if link-data
-        (let* ((url (car link-data))
-               (title (cadr link-data))
-               (json-payload (json-encode
-                              `(("type" . "link")
-                                ("url" . ,url)
-                                ("title" . ,title))))
-               (url-request-method "POST")
-               (url-request-extra-headers
-                `(("Content-Type" . "application/json")
-                  ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
-               (url-request-data json-payload))
-          (url-retrieve
-           karakeep-api-url
-           (lambda (status)
-             (goto-char url-http-end-of-headers)
-             (let ((response (buffer-substring-no-properties (point) (point-max))))
-               (message "Response: %s" response)
-               (if (string-match-p "error" response)
-                   (message "❌ Karakeep error: %s" response)
-                 (message "✅ Link sent to Karakeep: %s" url)))
-             (kill-buffer (current-buffer)))))
-      (message "⚠️ No valid Org link at point."))))
+  (if-let* ((link-data (karakeep--get-org-link-at-point))
+            (url (car link-data))
+            (title (cadr link-data))
+            (json-payload (json-encode
+                           `(("type" . "link")
+                             ("url" . ,url)
+                             ("title" . ,title))))
+            (url-request-method "POST")
+            (url-request-extra-headers
+             `(("Content-Type" . "application/json")
+               ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
+            (url-request-data json-payload))
+      (url-retrieve
+       karakeep-api-url
+       (lambda (status)
+         (goto-char url-http-end-of-headers)
+         (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
+                (parsed-response (ignore-errors (json-parse-string response)))
+                (response-url (when parsed-response
+                                (gethash "url" (gethash "content" parsed-response))))
+                (already-exists (when parsed-response
+                                  (eq (gethash "alreadyExists" parsed-response) t))))
+           (cond
+            ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
+             (message "ℹ️ Link already exists in Karakeep: %s" (or response-url url)))
+            ((and parsed-response (gethash "id" parsed-response))
+             (message "✅ Link sent to Karakeep: %s" (or response-url url)))
+            (t
+             (message "❌ Karakeep error: %s" (or response "Unknown error"))))
+           (kill-buffer (current-buffer)))))
+    (message "⚠️ No valid Org link at point.")))
 
 ;; Send marked text
 (defun karakeep-send-marked-text ()
@@ -97,7 +104,6 @@
          (lambda (status)
            (goto-char url-http-end-of-headers)
            (let ((response (buffer-substring-no-properties (point) (point-max))))
-             (message "Response: %s" response)
              (if (string-match-p "error" response)
                  (message "❌ Karakeep error: %s" response)
                (message "✅ Text sent to Karakeep.")))
@@ -105,4 +111,3 @@
     (message "⚠️ No active region (marked text).")))
 
 (provide 'karakeep-send)
-
