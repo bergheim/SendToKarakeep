@@ -27,13 +27,26 @@
 ;; Just don't use it to blow up the world. If you use it to blow
 ;; up the world, I'll be most put out! And don't use it to hurt people.
 
-
-;; Send Link to Karakeep
-
-;; This code simply lets you send an org-mode link or marked text
-;; to your karakeep server. You will need to put in your
-;; server IP/domain, your port, and the API key that you create
-;; in Karakeep.
+;;; Commentary:
+;;
+;; This package provides functions to send bookmarks, links, and text
+;; to a Karakeep server. It supports multiple contexts including:
+;; - Org-mode links
+;; - Selected text regions
+;; - Elfeed entries
+;; - EWW pages
+;;
+;; Usage:
+;;   M-x karakeep-dwim    ; Context-aware sending
+;;   C-u M-x karakeep-dwim ; Select target list
+;;
+;; Configuration:
+;;   (setq karakeep-base-url "https://your-server.com/api/v1")
+;;   (setq karakeep-api-token "your-token-here")
+;;
+;; Suggested keybindings:
+;;   (global-set-key (kbd "C-c k") #'karakeep-dwim)
+;;   (define-key elfeed-search-mode-map (kbd "K") #'karakeep-send-elfeed-entry)
 
 (defgroup karakeep nil
   "Send bookmarks to Karakeep."
