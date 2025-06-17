@@ -5,7 +5,7 @@
 ;; Maintainer: Summer Emacs <summeremacs@summerstar.me>
 ;; URL: https://github.com/summeremacs/SendToKarakeep/
 ;; Version: 1.0.0
-;; Package-Requires: Emacs and Karakeep
+;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
