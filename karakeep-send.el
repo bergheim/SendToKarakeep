@@ -154,6 +154,7 @@ STATUS is the response status from url-retrieve."
 (defun karakeep-dwim ()
   "Send content to Karakeep based on context.
 - In elfeed: send current entry
+- In eww: send current page url
 - With active region: send selected text
 - A link: send the link (org or otherwise)."
   (interactive)
