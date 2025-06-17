@@ -29,7 +29,10 @@
 
 ;; Send Link to Karakeep
 
-;; This code simply lets you send an org-mode link or marked text to your karakeep server. You will need to put in your server IP/domain, your port, and the API key that you create in Karakeep.
+;; This code simply lets you send an org-mode link or marked text
+;; to your karakeep server. You will need to put in your
+;; server IP/domain, your port, and the API key that you create
+;; in Karakeep.
 
 
 (defvar karakeep-api-url "http://YourIPorAddress:YourPort/api/v1/bookmarks"
