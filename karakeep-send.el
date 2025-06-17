@@ -60,7 +60,8 @@
 (defcustom karakeep-api-token "YourApiKey"
   "Authorization token for Karakeep."
   :type 'string
-  :group 'karakeep)
+  :group 'karakeep
+  :risky t)
 
 (defun karakeep--get-bookmarks-url ()
   "Get the bookmarks API endpoint."
