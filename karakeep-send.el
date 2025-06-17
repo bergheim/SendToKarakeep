@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;; Copyright (C) 2022-2025  Free Software Foundation, Inc.
 
 ;; Author: Summer Emacs <summeremacs@summerstar.me>
@@ -49,6 +50,25 @@
             (desc (org-element-contents context)))
         (list url (if desc (org-trim (org-no-properties (car desc))) ""))))))
 
+(defun karakeep--handle-response (status)
+  "Handle the response from Karakeep API.
+STATUS is the response status from url-retrieve."
+  (goto-char url-http-end-of-headers)
+  (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
+         (parsed-response (ignore-errors (json-parse-string response))))
+    (cond
+     ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
+      (let ((url (gethash "url" (gethash "content" parsed-response))))
+        (message "ℹ️ Already exists in Karakeep%s"
+                 (if url (format ": %s" url) ""))))
+     ((and parsed-response (gethash "id" parsed-response))
+      (let ((url (gethash "url" (gethash "content" parsed-response))))
+        (message "✅ Sent to Karakeep%s"
+                 (if url (format ": %s" url) ""))))
+     (t
+      (message "❌ Karakeep error: %s" (or response "Unknown error"))))
+    (kill-buffer (current-buffer))))
+
 ;; Send link that pointer is over
 (defun karakeep-send-link ()
   "Send the Org link at point to Karakeep."
@@ -65,28 +85,11 @@
              `(("Content-Type" . "application/json")
                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
             (url-request-data json-payload))
-      (url-retrieve
-       karakeep-api-url
-       (lambda (status)
-         (goto-char url-http-end-of-headers)
-         (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
-                (parsed-response (ignore-errors (json-parse-string response)))
-                (response-url (when parsed-response
-                                (gethash "url" (gethash "content" parsed-response))))
-                (already-exists (when parsed-response
-                                  (eq (gethash "alreadyExists" parsed-response) t))))
-           (cond
-            ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
-             (message "ℹ️ Link already exists in Karakeep: %s" (or response-url url)))
-            ((and parsed-response (gethash "id" parsed-response))
-             (message "✅ Link sent to Karakeep: %s" (or response-url url)))
-            (t
-             (message "❌ Karakeep error: %s" (or response "Unknown error"))))
-           (kill-buffer (current-buffer)))))
+      (url-retrieve karakeep-api-url #'karakeep--handle-response)
     (message "⚠️ No valid Org link at point.")))
 
 ;; Send marked text
-(defun karakeep-send-marked-text ()
+(defun karakeep-send-region ()
   "Send the currently active region (marked text) to Karakeep as a 'text' type."
   (interactive)
   (if (use-region-p)
@@ -99,15 +102,36 @@
               `(("Content-Type" . "application/json")
                 ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
              (url-request-data json-payload))
-        (url-retrieve
-         karakeep-api-url
-         (lambda (status)
-           (goto-char url-http-end-of-headers)
-           (let ((response (buffer-substring-no-properties (point) (point-max))))
-             (if (string-match-p "error" response)
-                 (message "❌ Karakeep error: %s" response)
-               (message "✅ Text sent to Karakeep.")))
-           (kill-buffer (current-buffer)))))
+        (url-retrieve karakeep-api-url #'karakeep--handle-response))
     (message "⚠️ No active region (marked text).")))
+
+
+(defun karakeep-send-elfeed-entry ()
+  "Star the current Elfeed entry and send it to Karakeep."
+  (interactive)
+  (let* ((entry (if (eq major-mode 'elfeed-show-mode)
+                    elfeed-show-entry
+                  (elfeed-search-selected :single)))
+         (url (when entry (elfeed-entry-link entry)))
+         (title (when entry (elfeed-entry-title entry))))
+
+    (if (not entry)
+        (message "⚠️ No entry selected.")
+      ;; Add star tag to the entry
+      (elfeed-tag entry 'star)
+      (when (eq major-mode 'elfeed-search-mode)
+        (elfeed-search-update-entry entry))
+
+      ;; Send to Karakeep
+      (let* ((json-payload (json-encode
+                            `(("type" . "link")
+                              ("url" . ,url)
+                              ("title" . ,title))))
+             (url-request-method "POST")
+             (url-request-extra-headers
+              `(("Content-Type" . "application/json")
+                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
+             (url-request-data json-payload))
+        (url-retrieve karakeep-api-url #'karakeep--handle-response)))))
 
 (provide 'karakeep-send)
