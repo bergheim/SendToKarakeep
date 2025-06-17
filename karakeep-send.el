@@ -1,10 +1,10 @@
 ;; Copyright (C) 2022-2025  Free Software Foundation, Inc.
 
-;; Author: Protesilaos Stavrou <info@protesilaos.com>
-;; Maintainer: Protesilaos Stavrou <info@protesilaos.com>
-;; URL: https://github.com/protesilaos/denote
-;; Version: 4.0.0
-;; Package-Requires: ((emacs "28.1"))
+;; Author: Summer Emacs <summeremacs@summerstar.me>
+;; Maintainer: Summer Emacs <summeremacs@summerstar.me>
+;; URL: https://github.com/summeremacs/SendToKarakeep/
+;; Version: 1.0.0
+;; Package-Requires: Emacs and Karakeep
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -20,6 +20,7 @@
 ;;
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 
 ;; Send Link to Karakeep
 
