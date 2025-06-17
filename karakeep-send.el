@@ -134,9 +134,27 @@ STATUS is the response status from url-retrieve."
              (url-request-data json-payload))
         (url-retrieve karakeep-api-url #'karakeep--handle-response)))))
 
+(defun karakeep-send-eww-page ()
+  "Send the current EWW page to Karakeep."
+  (interactive)
+  (let* ((url (eww-current-url))
+         (title (plist-get eww-data :title)))
+    (when url
+      (let* ((json-payload (json-encode
+                            `(("type" . "link")
+                              ("url" . ,url)
+                              ("title" . ,title))))
+             (url-request-method "POST")
+             (url-request-extra-headers
+              `(("Content-Type" . "application/json")
+                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
+             (url-request-data json-payload))
+        (url-retrieve karakeep-api-url #'karakeep--handle-response)))))
+
 (defun karakeep-dwim ()
   "Send content to Karakeep based on context.
 - In elfeed: send current entry
+- In eww: send current page url
 - With active region: send selected text
 - A link: send the link (org or otherwise)."
   (interactive)
@@ -145,6 +163,9 @@ STATUS is the response status from url-retrieve."
    ((or (eq major-mode 'elfeed-show-mode)
         (eq major-mode 'elfeed-search-mode))
     (karakeep-send-elfeed-entry))
+
+   ((eq major-mode 'eww-mode)
+    (karakeep-send-eww-page))
 
    ((use-region-p)
     (karakeep-send-region))
