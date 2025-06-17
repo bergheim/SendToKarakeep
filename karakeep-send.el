@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;; Copyright (C) 2022-2025  Free Software Foundation, Inc.
 
 ;; Author: Summer Emacs <summeremacs@summerstar.me>
