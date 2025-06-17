@@ -89,7 +89,7 @@ STATUS is the response status from url-retrieve."
     (message "⚠️ No valid Org link at point.")))
 
 ;; Send marked text
-(defun karakeep-send-marked-text ()
+(defun karakeep-send-region ()
   "Send the currently active region (marked text) to Karakeep as a 'text' type."
   (interactive)
   (if (use-region-p)
@@ -106,9 +106,8 @@ STATUS is the response status from url-retrieve."
     (message "⚠️ No active region (marked text).")))
 
 
-(defun elfeed-star-and-send-to-karakeep ()
-  "Star the current Elfeed entry and send it to Karakeep.
-Works in both elfeed-search-mode and elfeed-show-mode."
+(defun karakeep-send-elfeed-entry ()
+  "Star the current Elfeed entry and send it to Karakeep."
   (interactive)
   (let* ((entry (if (eq major-mode 'elfeed-show-mode)
                     elfeed-show-entry
