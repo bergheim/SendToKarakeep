@@ -50,6 +50,26 @@
             (desc (org-element-contents context)))
         (list url (if desc (org-trim (org-no-properties (car desc))) ""))))))
 
+(defun karakeep--handle-response (status url)
+  "Handle the response from Karakeep API.
+STATUS is the response status from url-retrieve.
+URL is the original URL being sent, used in status messages."
+  (goto-char url-http-end-of-headers)
+  (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
+         (parsed-response (ignore-errors (json-parse-string response)))
+         (response-url (when parsed-response
+                         (gethash "url" (gethash "content" parsed-response))))
+         (already-exists (when parsed-response
+                           (eq (gethash "alreadyExists" parsed-response) t))))
+    (cond
+     ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
+      (message "ℹ️ Link already exists in Karakeep: %s" (or response-url url)))
+     ((and parsed-response (gethash "id" parsed-response))
+      (message "✅ Link sent to Karakeep: %s" (or response-url url)))
+     (t
+      (message "❌ Karakeep error: %s" (or response "Unknown error"))))
+    (kill-buffer (current-buffer))))
+
 ;; Send link that pointer is over
 (defun karakeep-send-link ()
   "Send the Org link at point to Karakeep."
@@ -66,24 +86,8 @@
              `(("Content-Type" . "application/json")
                ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
             (url-request-data json-payload))
-      (url-retrieve
-       karakeep-api-url
-       (lambda (status)
-         (goto-char url-http-end-of-headers)
-         (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
-                (parsed-response (ignore-errors (json-parse-string response)))
-                (response-url (when parsed-response
-                                (gethash "url" (gethash "content" parsed-response))))
-                (already-exists (when parsed-response
-                                  (eq (gethash "alreadyExists" parsed-response) t))))
-           (cond
-            ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
-             (message "ℹ️ Link already exists in Karakeep: %s" (or response-url url)))
-            ((and parsed-response (gethash "id" parsed-response))
-             (message "✅ Link sent to Karakeep: %s" (or response-url url)))
-            (t
-             (message "❌ Karakeep error: %s" (or response "Unknown error"))))
-           (kill-buffer (current-buffer)))))
+      (url-retrieve karakeep-api-url
+                    (lambda (status) (karakeep--handle-response status url)))
     (message "⚠️ No valid Org link at point.")))
 
 ;; Send marked text
@@ -100,15 +104,8 @@
               `(("Content-Type" . "application/json")
                 ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
              (url-request-data json-payload))
-        (url-retrieve
-         karakeep-api-url
-         (lambda (status)
-           (goto-char url-http-end-of-headers)
-           (let ((response (buffer-substring-no-properties (point) (point-max))))
-             (if (string-match-p "error" response)
-                 (message "❌ Karakeep error: %s" response)
-               (message "✅ Text sent to Karakeep.")))
-           (kill-buffer (current-buffer)))))
+        (url-retrieve karakeep-api-url
+                      (lambda (status) (karakeep--handle-response status "text content"))))
     (message "⚠️ No active region (marked text).")))
 
 
@@ -139,23 +136,7 @@ Works in both elfeed-search-mode and elfeed-show-mode."
               `(("Content-Type" . "application/json")
                 ("Authorization" . ,(concat "Bearer " karakeep-api-token))))
              (url-request-data json-payload))
-        (url-retrieve
-         karakeep-api-url
-         (lambda (status)
-           (goto-char url-http-end-of-headers)
-           (let* ((response (string-trim (buffer-substring-no-properties (point) (point-max))))
-                  (parsed-response (ignore-errors (json-parse-string response)))
-                  (response-url (when parsed-response
-                                  (gethash "url" (gethash "content" parsed-response))))
-                  (already-exists (when parsed-response
-                                    (eq (gethash "alreadyExists" parsed-response) t))))
-             (cond
-              ((and parsed-response (eq (gethash "alreadyExists" parsed-response) t))
-               (message "ℹ️ Link already exists in Karakeep: %s" (or response-url url)))
-              ((and parsed-response (gethash "id" parsed-response))
-               (message "✅ Link starred and sent to Karakeep: %s" (or response-url url)))
-              (t
-               (message "❌ Karakeep error: %s" (or response "Unknown error"))))
-             (kill-buffer (current-buffer)))))))))
+        (url-retrieve karakeep-api-url
+                      (lambda (status) (karakeep--handle-response status url)))))))
 
 (provide 'karakeep-send)
