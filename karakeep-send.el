@@ -35,12 +35,19 @@
 ;; server IP/domain, your port, and the API key that you create
 ;; in Karakeep.
 
+(defgroup karakeep nil
+  "Send bookmarks to Karakeep."
+  :group 'external)
 
-(defvar karakeep-api-url "http://YourIPorAddress:YourPort/api/v1/bookmarks"
-  "Karakeep API endpoint for saving links.")
+(defcustom karakeep-api-url "http://localhost:3000/api/v1/bookmarks"
+  "Karakeep API endpoint for saving links."
+  :type 'string
+  :group 'karakeep)
 
-(defvar karakeep-api-token "YourAPIKey"
-  "Authorization token for Karakeep.")
+(defcustom karakeep-api-token "YourApiKey"
+  "Authorization token for Karakeep."
+  :type 'string
+  :group 'karakeep)
 
 (defun karakeep--send-request (payload)
   "Send PAYLOAD to Karakeep API.
@@ -82,11 +89,22 @@ STATUS is the response status from url-retrieve."
             (desc (org-element-contents context)))
         (list url (if desc (org-trim (org-no-properties (car desc))) ""))))))
 
+(defun karakeep--get-link-at-point ()
+  "Extract link at point from various contexts."
+  (cond
+   ;; either org..
+   ((and (derived-mode-p 'org-mode)
+         (karakeep--get-org-link-at-point)))
+
+   ;; ..or whatever URL we can find
+   ((thing-at-point 'url)
+    (list (thing-at-point 'url) ""))))
+
 ;; Send link that pointer is over
 (defun karakeep-send-link ()
-  "Send the Org link at point to Karakeep."
+  "Send the link at point to Karakeep."
   (interactive)
-  (if-let* ((link-data (karakeep--get-org-link-at-point))
+  (if-let* ((link-data (karakeep--get-link-at-point))
             (url (car link-data))
             (title (cadr link-data)))
       (karakeep--send-request `(("type" . "link")
@@ -133,6 +151,7 @@ STATUS is the response status from url-retrieve."
                                 ("url" . ,url)
                                 ("title" . ,title))))))
 
+;;;###autoload
 (defun karakeep-dwim ()
   "Send content to Karakeep based on context.
 - In elfeed: send current entry
