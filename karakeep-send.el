@@ -134,11 +134,11 @@ CALLBACK is optional - if provided, called with (bookmark-id success-p) as argum
 
 (defun karakeep--get-org-link-at-point ()
   "Extract the Org-mode link at point."
-  (let ((context (org-element-context)))
-    (when (eq (car context) 'link)
-      (let ((url (org-element-property :raw-link context))
-            (desc (org-element-contents context)))
-        (list url (if desc (org-trim (org-no-properties (car desc))) ""))))))
+  (when-let* ((context (org-element-context))
+              ((eq (car context) 'link))
+              (url (org-element-property :raw-link context))
+              (desc (org-element-contents context)))
+    (list url (if desc (org-trim (org-no-properties (car desc))) ""))))
 
 (defun karakeep--get-link-at-point ()
   "Extract link at point from various contexts."
@@ -154,42 +154,41 @@ CALLBACK is optional - if provided, called with (bookmark-id success-p) as argum
 (defun karakeep--fetch-lists-sync ()
   "Fetch lists from Karakeep API synchronously.
 Returns the parsed JSON response or nil on error."
-  (let* ((url-request-method "GET")
-         (url-request-extra-headers
-          `(("Authorization" . ,(concat "Bearer " karakeep-api-token))))
-         (buffer (url-retrieve-synchronously (karakeep--get-lists-url))))
-    (when buffer
-      (with-current-buffer buffer
-        (goto-char url-http-end-of-headers)
-        (let* ((response (string-trim
-                          (buffer-substring-no-properties (point) (point-max))))
-               (parsed-response (ignore-errors (json-parse-string response))))
-          (kill-buffer buffer)
-          parsed-response)))))
+  (if-let* ((url-request-method "GET")
+            (url-request-extra-headers
+             `(("Authorization" . ,(concat "Bearer " karakeep-api-token))))
+            (buffer (url-retrieve-synchronously (karakeep--get-lists-url)))
+            (response (with-current-buffer buffer
+                        (goto-char url-http-end-of-headers)
+                        (prog1 (string-trim
+                                (buffer-substring-no-properties (point) (point-max)))
+                          (kill-buffer buffer))))
+            (parsed-response (ignore-errors (json-parse-string response))))
+      parsed-response
+    (message "❌ %s" (if buffer
+                         (concat "Karakeep list error: " (or response "Unknown error"))
+                       "Could not connect to Karakeep"))))
 
 (defun karakeep--parse-lists (api-response)
   "Parse the API response and return a list of (display-name . id) pairs.
 API-RESPONSE is the hash table returned from the API."
-  (when-let ((lists-array (gethash "lists" api-response)))
+  (when-let ((api-response api-response)
+             (lists-array (gethash "lists" api-response)))
     (mapcar (lambda (list-hash)
               (let ((name (gethash "name" list-hash))
                     (icon (gethash "icon" list-hash))
                     (id (gethash "id" list-hash)))
-                (cons (format "%s %s" icon name)  ; Display as "🎮 gaming"
-                      id)))                       ; Store the ID
-            (append lists-array nil))))           ; Convert vector to list
+                (cons (format "%s %s" icon name)
+                      id)))
+            (append lists-array nil))))
 
 (defun karakeep--select-list ()
   "Fetch lists and prompt user to select one.
 Returns the selected list ID or nil if cancelled/failed."
-  (let* ((raw-lists (karakeep--fetch-lists-sync))
-         (parsed-lists (karakeep--parse-lists raw-lists)))
-    (if parsed-lists
-        (let ((selection (completing-read "Select Karakeep list: " parsed-lists)))
-          (cdr (assoc selection parsed-lists)))
-      (progn
-        (message "❌ Could not fetch lists from Karakeep")
-        nil))))
+  (when-let* ((raw-lists (karakeep--fetch-lists-sync))
+              (parsed-lists (karakeep--parse-lists raw-lists))
+              (selection (completing-read "Select Karakeep list: " parsed-lists)))
+    (cdr (assoc selection parsed-lists))))
 
 (defun karakeep-send-link (&optional list-id)
   "Send the link at point to Karakeep."
@@ -217,6 +216,8 @@ Returns the selected list ID or nil if cancelled/failed."
 (defun karakeep-send-elfeed-entry (&optional list-id)
   "Star the current Elfeed entry and send it to Karakeep."
   (interactive)
+  (unless (featurep 'elfeed)
+    (user-error "Elfeed is not available"))
   (let* ((entry (if (eq major-mode 'elfeed-show-mode)
                     elfeed-show-entry
                   (elfeed-search-selected :single)))
